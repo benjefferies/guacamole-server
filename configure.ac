@@ -80,13 +80,20 @@ AC_CHECK_LIB([pthread], [pthread_create], [PTHREAD_LIBS=-lpthread
 # Check for pthread_setattr_default_np
 AC_CHECK_DECLS([pthread_setattr_default_np], , , [[#include <pthread.h>]])
             
-# librt
-AC_CHECK_FUNC([timer_create], [AC_MSG_RESULT([timer_create was found without librt.])],
-              [AC_CHECK_LIB([rt], [timer_create],
-                            [AC_MSG_RESULT([timer_create was found in librt.])
-                                           RT_LIBS=-lrt],
-                            [AC_MSG_ERROR([timer_create could not be found.])])
-              ])
+# librt (POSIX timers are not used on macOS; guacenc uses pthreads instead)
+case $host_os in
+  darwin*)
+    AC_MSG_RESULT([timer_create check skipped on macOS])
+    ;;
+  *)
+    AC_CHECK_FUNC([timer_create], [AC_MSG_RESULT([timer_create was found without librt.])],
+                  [AC_CHECK_LIB([rt], [timer_create],
+                                [AC_MSG_RESULT([timer_create was found in librt.])
+                                               RT_LIBS=-lrt],
+                                [AC_MSG_ERROR([timer_create could not be found.])])
+                  ])
+    ;;
+esac
 
 # Include libdl for dlopen() if necessary
 AC_CHECK_LIB([dl], [dlopen],

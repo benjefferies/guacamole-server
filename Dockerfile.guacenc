@@ -1,0 +1,118 @@
+# syntax=docker/dockerfile:1.4
+#
+# Dockerfile for guacenc (Guacamole video encoder)
+#
+# Target platform: linux/arm64 (Apple Silicon Macs via Docker Desktop)
+#
+# Build from source:
+#
+#   docker build --platform linux/arm64 -f Dockerfile.guacenc -t guacenc .
+#
+# Export build artifacts, then load them into a runtime image:
+#
+#   docker build --platform linux/arm64 -f Dockerfile.guacenc \
+#       --target artifacts --output type=local,dest=./prebuilt .
+#
+#   docker build --platform linux/arm64 -f Dockerfile.guacenc \
+#       --target runtime-prebuilt --build-context prebuilt=./prebuilt -t guacenc .
+#
+# Run against mounted recordings:
+#
+#   docker run --rm -v "$PWD/recordings:/recordings" guacenc /recordings/session.guac
+#
+
+ARG ALPINE_VERSION=3.21
+ARG PREFIX_DIR=/opt/guacamole
+ARG BUILD_DIR=/tmp/guacamole-server
+
+#
+# Build guacenc and libguac from source.
+#
+
+FROM alpine:${ALPINE_VERSION} AS builder
+ARG BUILD_DIR
+ARG PREFIX_DIR
+
+RUN apk add --no-cache \
+        autoconf \
+        automake \
+        build-base \
+        cairo-dev \
+        ffmpeg-dev \
+        libjpeg-turbo-dev \
+        libpng-dev \
+        libtool \
+        libwebp-dev \
+        make \
+        pkgconf \
+        util-linux-dev
+
+COPY . ${BUILD_DIR}
+WORKDIR ${BUILD_DIR}
+
+RUN autoreconf -fi && \
+    ./configure --prefix="${PREFIX_DIR}" \
+        --disable-guacd \
+        --disable-guaclog \
+        --disable-kubernetes \
+        --without-rdp \
+        --without-ssh \
+        --without-vnc \
+        --without-telnet \
+        --without-terminal \
+        --without-pulse && \
+    make -j"$(nproc)" && \
+    make install
+
+COPY ./src/guacd-docker/bin/list-dependencies.sh /usr/local/bin/list-dependencies.sh
+RUN list-dependencies.sh "${PREFIX_DIR}/bin/guacenc" > "${PREFIX_DIR}/DEPENDENCIES"
+
+#
+# Exportable artifact tree for the runtime-prebuilt target.
+#
+
+FROM scratch AS artifacts
+ARG PREFIX_DIR
+COPY --from=builder ${PREFIX_DIR}/ /
+
+#
+# Runtime image built from source (default target).
+#
+
+FROM alpine:${ALPINE_VERSION} AS runtime
+ARG PREFIX_DIR
+
+COPY --from=builder ${PREFIX_DIR} ${PREFIX_DIR}
+COPY ./src/guacenc-docker/bin/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN apk add --no-cache ca-certificates && \
+    xargs apk add --no-cache < "${PREFIX_DIR}/DEPENDENCIES" && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+ENV LD_LIBRARY_PATH=${PREFIX_DIR}/lib
+ENV PATH=${PREFIX_DIR}/bin:${PATH}
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+#
+# Runtime image built from pre-exported Linux/arm64 artifacts.
+#
+# Artifacts must be exported first:
+#   docker build -f Dockerfile.guacenc --target artifacts \
+#       --output type=local,dest=./prebuilt .
+#
+
+FROM alpine:${ALPINE_VERSION} AS runtime-prebuilt
+ARG PREFIX_DIR
+
+COPY --from=prebuilt / ${PREFIX_DIR}
+COPY ./src/guacenc-docker/bin/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN apk add --no-cache ca-certificates && \
+    xargs apk add --no-cache < "${PREFIX_DIR}/DEPENDENCIES" && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+ENV LD_LIBRARY_PATH=${PREFIX_DIR}/lib
+ENV PATH=${PREFIX_DIR}/bin:${PATH}
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

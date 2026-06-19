@@ -46,6 +46,12 @@ stamp-h1
 # Generated docs
 doc/*/doxygen-output
 
+# guacenc Docker export artifacts
+prebuilt/
+
+# guacenc macOS build output
+dist/
+
 # IDE metadata
 nbproject/
 

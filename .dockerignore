@@ -1,6 +1,9 @@
 # Docker build spec
 Dockerfile
 
+# guacenc prebuilt artifacts (loaded via named build context)
+prebuilt/
+
 # Git repository metadata
 .git
 **/.gitignore
