@@ -20,7 +20,6 @@
 #include "argv.h"
 #include "common/defaults.h"
 #include "common/string.h"
-#include "config.h"
 #include "rdp.h"
 #include "resolution.h"
 #include "settings.h"
@@ -135,9 +134,9 @@ const char* GUAC_RDP_CLIENT_ARGS[] = {
 
     "gateway-hostname",
     "gateway-port",
-    "gateway-domain",
-    "gateway-username",
-    "gateway-password",
+    GUAC_RDP_ARGV_GATEWAY_DOMAIN,
+    GUAC_RDP_ARGV_GATEWAY_USERNAME,
+    GUAC_RDP_ARGV_GATEWAY_PASSWORD,
 
     "load-balance-info",
 

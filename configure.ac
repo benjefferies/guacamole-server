@@ -161,7 +161,7 @@ AC_SUBST(UUID_LIBS)
 AC_SUBST(CUNIT_LIBS)
 
 # Library functions
-AC_CHECK_FUNCS([clock_gettime gettimeofday memmove memset select strdup nanosleep prctl])
+AC_CHECK_FUNCS([clock_gettime gettimeofday memmove memset select strdup nanosleep prctl close_range])
 
 AC_CHECK_DECL([png_get_io_ptr],
     [AC_DEFINE([HAVE_PNG_GET_IO_PTR],,
@@ -1018,6 +1018,22 @@ fi
 if test "x${have_freerdp}" = "xyes"
 then
     AC_CHECK_MEMBERS([freerdp.VerifyCertificateEx],,,
+                      [[#include <freerdp/freerdp.h>]])
+fi
+
+# Check for either AuthenticateEx or Authenticate callbacks.
+if test "x${have_freerdp}" = "xyes"
+then
+    AC_CHECK_MEMBERS([freerdp.AuthenticateEx],,
+                     [AC_CHECK_MEMBERS([freerdp.Authenticate],,
+                                       [AC_MSG_WARN([
+  ----------------------------------------------------
+   This version of FreeRDP appears to lack support
+   for both Authenticate and AuthenticateEx functions.
+   RDP connections may fail if credentials are not
+   provided with the connection.
+  ----------------------------------------------------])],
+                                       [[#include <freerdp/freerdp.h>]])],
                       [[#include <freerdp/freerdp.h>]])
 fi
 
